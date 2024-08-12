@@ -1,5 +1,7 @@
 #![allow(dead_code)]
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, Stdin};
+use std::sync::mpsc::{channel, Receiver};
+use std::thread;
 
 #[derive(Debug)]
 struct DataStore {
@@ -22,7 +24,7 @@ impl DataStore {
     }
 
     fn add_entry(&mut self, data: Vec<f32>) {
-        self.store_width = data.len(); // FIX:
+        self.store_width = data.len();
         dbg!(data.len());
         self.store.push(data);
         self.store_len += 1;
@@ -45,9 +47,6 @@ impl DataStore {
     }
 }
 
-use std::io::Stdin;
-use std::sync::mpsc::{channel, Receiver};
-use std::thread;
 fn read_them_values(stdin: Stdin) -> Receiver<Vec<f32>> {
     let (tx, rx) = channel();
     thread::spawn(move || {
@@ -57,7 +56,9 @@ fn read_them_values(stdin: Stdin) -> Receiver<Vec<f32>> {
                     .split_whitespace()
                     .filter_map(|x| x.parse::<f32>().ok())
                     .collect();
-                tx.send(data).unwrap();
+                if !data.is_empty() {
+                    tx.send(data).unwrap();
+                }
             }
         }
     });
@@ -66,8 +67,7 @@ fn read_them_values(stdin: Stdin) -> Receiver<Vec<f32>> {
 
 fn main() {
     let mut dataset = DataStore::new();
-    let stdin = io::stdin();
-    let rx = read_them_values(stdin);
+    let rx = read_them_values(io::stdin());
     loop {
         if let Ok(rx) = rx.recv() {
             dataset.add_entry(rx);
