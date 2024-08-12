@@ -22,7 +22,8 @@ impl DataStore {
     }
 
     fn add_entry(&mut self, data: Vec<f32>) {
-        self.store_width = data.len();
+        self.store_width = data.len(); // FIX:
+        dbg!(data.len());
         self.store.push(data);
         self.store_len += 1;
     }
@@ -44,29 +45,10 @@ impl DataStore {
     }
 }
 
+use std::io::Stdin;
 use std::sync::mpsc::{channel, Receiver};
 use std::thread;
-fn read_them_values() -> Receiver<Vec<f32>> {
-    let (tx, rx) = channel();
-    thread::spawn(move || {
-        let stdin = io::stdin();
-        for line in stdin.lock().lines() {
-            if let Ok(line) = line {
-                let data: Vec<f32> = line
-                    .split_whitespace()
-                    .filter_map(|x| x.parse::<f32>().ok())
-                    .collect();
-                if !data.is_empty() {
-                    tx.send(data).unwrap();
-                }
-            }
-        }
-    });
-    return rx;
-}
-
-use std::io::Stdin;
-fn new_reader(stdin: Stdin) -> Receiver<Vec<f32>> {
+fn read_them_values(stdin: Stdin) -> Receiver<Vec<f32>> {
     let (tx, rx) = channel();
     thread::spawn(move || {
         for line in stdin.lock().lines() {
@@ -75,9 +57,7 @@ fn new_reader(stdin: Stdin) -> Receiver<Vec<f32>> {
                     .split_whitespace()
                     .filter_map(|x| x.parse::<f32>().ok())
                     .collect();
-                if !data.is_empty() {
-                    tx.send(data).unwrap();
-                }
+                tx.send(data).unwrap();
             }
         }
     });
@@ -87,9 +67,11 @@ fn new_reader(stdin: Stdin) -> Receiver<Vec<f32>> {
 fn main() {
     let mut dataset = DataStore::new();
     let stdin = io::stdin();
-    let rx = new_reader(stdin).recv().unwrap();
-    while rx {
-        dataset.add_entry(rx.clone());
-        dbg!(&dataset);
+    let rx = read_them_values(stdin);
+    loop {
+        if let Ok(rx) = rx.recv() {
+            dataset.add_entry(rx);
+            dbg!(&dataset);
+        }
     }
 }
