@@ -65,9 +65,31 @@ fn read_them_values() -> Receiver<Vec<f32>> {
     return rx;
 }
 
+use std::io::Stdin;
+fn new_reader(stdin: Stdin) -> Receiver<Vec<f32>> {
+    let (tx, rx) = channel();
+    thread::spawn(move || {
+        for line in stdin.lock().lines() {
+            if let Ok(line) = line {
+                let data: Vec<f32> = line
+                    .split_whitespace()
+                    .filter_map(|x| x.parse::<f32>().ok())
+                    .collect();
+                if !data.is_empty() {
+                    tx.send(data).unwrap();
+                }
+            }
+        }
+    });
+    return rx;
+}
+
 fn main() {
     let mut dataset = DataStore::new();
-    let rx = read_them_values().recv().unwrap();
-    dataset.add_entry(rx);
-    dbg!(&dataset);
+    let stdin = io::stdin();
+    let rx = new_reader(stdin).recv().unwrap();
+    while rx {
+        dataset.add_entry(rx.clone());
+        dbg!(&dataset);
+    }
 }
