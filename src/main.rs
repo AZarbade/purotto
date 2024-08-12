@@ -1,7 +1,5 @@
 #![allow(dead_code)]
 use std::io::{self, BufRead};
-use std::sync::mpsc;
-use std::thread;
 
 #[derive(Debug)]
 struct DataStore {
@@ -34,53 +32,42 @@ impl DataStore {
     }
 
     fn info(&self) {
-        // print: len, width, head/tail
-        todo!();
+        println!("DataStore Info:");
+        println!("  Length: {}", self.store_len);
+        println!("  Width: {}", self.store_width);
+        if let Some(head) = self.store.first() {
+            println!("  Head: {:?}", head);
+        }
+        if let Some(tail) = self.store.last() {
+            println!("  Tail: {:?}", tail);
+        }
     }
 }
 
-fn main() {
-    let (tx, rx) = mpsc::channel();
+use std::sync::mpsc::{channel, Receiver};
+use std::thread;
+fn read_them_values() -> Receiver<Vec<f32>> {
+    let (tx, rx) = channel();
     thread::spawn(move || {
         let stdin = io::stdin();
         for line in stdin.lock().lines() {
             if let Ok(line) = line {
-                dbg!(tx.send(line).unwrap());
+                let data: Vec<f32> = line
+                    .split_whitespace()
+                    .filter_map(|x| x.parse::<f32>().ok())
+                    .collect();
+                if !data.is_empty() {
+                    tx.send(data).unwrap();
+                }
             }
         }
     });
-
-    let mut dataset = DataStore::new();
-
-    for received in rx {
-        let data: Vec<f32> = received
-            .split_whitespace()
-            .filter_map(|x| x.parse::<f32>().ok())
-            .collect();
-
-        if !data.is_empty() {
-            dataset.add_entry(data);
-        }
-        dbg!(&dataset.get(0));
-    }
+    return rx;
 }
 
-// NOTE:
-// [src/main.rs:60:9] &dataset = DataStore {
-//     store: [
-//         [
-//             248.0,
-//             175.0,
-//             160.0,
-//             180.0,
-//         ],
-//         [
-//             279.0,
-//             46.0,
-//             172.0,
-//             81.0,
-//         ],
-//     ],
-//     store_len: 2,
-//     store_width: 4,
-// }
+fn main() {
+    let mut dataset = DataStore::new();
+    let rx = read_them_values().recv().unwrap();
+    dataset.add_entry(rx);
+    dbg!(&dataset);
+}
