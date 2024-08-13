@@ -1,10 +1,13 @@
 use std::io::{self, BufRead, Stdin};
-use std::sync::mpsc::{channel, Receiver};
+use std::sync::{
+    mpsc::{channel, Receiver},
+    Arc, Mutex,
+};
 use std::thread;
 
 mod dataset;
 
-fn read_them_values(stdin: Stdin) -> Receiver<Vec<f32>> {
+fn stdin_reader(stdin: Stdin) -> Receiver<Vec<f32>> {
     let (tx, rx) = channel();
     thread::spawn(move || {
         for line in stdin.lock().lines() {
@@ -22,13 +25,19 @@ fn read_them_values(stdin: Stdin) -> Receiver<Vec<f32>> {
     return rx;
 }
 
-fn main() {
-    let mut dataset = dataset::DataStore::new();
-    let rx = read_them_values(io::stdin());
+fn stdin_processer(storage: Arc<Mutex<dataset::DataStore>>, rx: Receiver<Vec<f32>>) {
     loop {
         if let Ok(rx) = rx.recv() {
-            dataset.add_entry(rx);
-            dbg!(&dataset);
+            storage.lock().expect("oka").add_entry(rx);
         }
     }
+}
+
+fn main() {
+    let storage = Arc::new(Mutex::new(dataset::DataStore::new()));
+    let storage_pointer = storage.clone();
+    thread::spawn(move || {
+        stdin_processer(storage_pointer, stdin_reader(io::stdin()));
+    });
+    dbg!(&storage);
 }

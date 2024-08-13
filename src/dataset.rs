@@ -1,5 +1,3 @@
-// TODO: test for remove_entry() pending.
-
 #[derive(Debug)]
 pub struct DataStore {
     store: Vec<Vec<f32>>,
