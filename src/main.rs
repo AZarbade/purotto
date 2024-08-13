@@ -1,53 +1,13 @@
-#![allow(dead_code)]
 use std::io::{self, BufRead, Stdin};
-use std::sync::mpsc::{channel, Receiver};
+use std::sync::{
+    mpsc::{channel, Receiver},
+    Arc, Mutex,
+};
 use std::thread;
 
-#[derive(Debug)]
-struct DataStore {
-    store: Vec<Vec<f32>>,
-    store_len: usize,
-    store_width: usize,
-}
+mod dataset;
 
-impl DataStore {
-    fn new() -> Self {
-        DataStore {
-            store: Vec::new(),
-            store_len: 0,
-            store_width: 0,
-        }
-    }
-
-    fn get(&self, stream_index: usize) -> Vec<f32> {
-        return self.store[stream_index].clone();
-    }
-
-    fn add_entry(&mut self, data: Vec<f32>) {
-        self.store_width = data.len();
-        dbg!(data.len());
-        self.store.push(data);
-        self.store_len += 1;
-    }
-
-    fn remove_entry(&mut self) {
-        todo!();
-    }
-
-    fn info(&self) {
-        println!("DataStore Info:");
-        println!("  Length: {}", self.store_len);
-        println!("  Width: {}", self.store_width);
-        if let Some(head) = self.store.first() {
-            println!("  Head: {:?}", head);
-        }
-        if let Some(tail) = self.store.last() {
-            println!("  Tail: {:?}", tail);
-        }
-    }
-}
-
-fn read_them_values(stdin: Stdin) -> Receiver<Vec<f32>> {
+fn stdin_reader(stdin: Stdin) -> Receiver<Vec<f32>> {
     let (tx, rx) = channel();
     thread::spawn(move || {
         for line in stdin.lock().lines() {
@@ -65,13 +25,19 @@ fn read_them_values(stdin: Stdin) -> Receiver<Vec<f32>> {
     return rx;
 }
 
-fn main() {
-    let mut dataset = DataStore::new();
-    let rx = read_them_values(io::stdin());
+fn stdin_processer(storage: Arc<Mutex<dataset::DataStore>>, rx: Receiver<Vec<f32>>) {
     loop {
         if let Ok(rx) = rx.recv() {
-            dataset.add_entry(rx);
-            dbg!(&dataset);
+            storage.lock().expect("oka").add_entry(rx);
         }
     }
+}
+
+fn main() {
+    let storage = Arc::new(Mutex::new(dataset::DataStore::new()));
+    let storage_pointer = storage.clone();
+    thread::spawn(move || {
+        stdin_processer(storage_pointer, stdin_reader(io::stdin()));
+    });
+    dbg!(&storage);
 }
