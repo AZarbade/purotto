@@ -1,7 +1,7 @@
-#[derive(Debug)]
+#[derive(Default, Debug)]
 pub struct DataStore {
     pub store: Vec<Vec<f32>>,
-    store_len: usize,
+    pub store_len: usize,
     store_width: usize,
 }
 
@@ -16,6 +16,14 @@ impl DataStore {
 
     pub fn get_entry(&self, stream_index: usize, entry_index: usize) -> f32 {
         return self.store[stream_index][entry_index];
+    }
+
+    pub fn get_stream(&self, stream_index: usize) -> Vec<f32> {
+        let mut stream = Vec::new();
+        for i in 0..self.store_len {
+            stream.push(self.store[i][stream_index]);
+        }
+        return stream;
     }
 
     pub fn add_entry(&mut self, data: Vec<f32>) {

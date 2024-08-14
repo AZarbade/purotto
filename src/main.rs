@@ -1,3 +1,5 @@
+use eframe::egui;
+use egui_plot::{Legend, Line, Plot, PlotPoints};
 use std::io::{self, BufRead, Stdin};
 use std::sync::{
     mpsc::{channel, Receiver},
@@ -33,6 +35,35 @@ fn stdin_processer(storage: Arc<Mutex<dataset::DataStore>>, rx: Receiver<Vec<f32
                 .expect("ERROR: failed to acquire lock on storage")
                 .add_entry(rx);
         }
+        dbg!(&storage);
+    }
+}
+
+#[derive(Default)]
+struct MyApp {
+    storage: Arc<Mutex<dataset::DataStore>>,
+}
+
+impl MyApp {
+    fn data_line(&self, index: usize) -> Line {
+        return Line::new(PlotPoints::from_ys_f32(
+            &self.storage.lock().unwrap().get_stream(index),
+        ));
+    }
+}
+
+impl eframe::App for MyApp {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let mut plot_rect = None;
+        egui::CentralPanel::default().show(ctx, |ui| {
+            ui.heading("Value Plotting");
+
+            let plot = Plot::new("Plot").legend(Legend::default());
+            let inner = plot.show(ui, |plot_ui| {
+                plot_ui.line(self.data_line(1));
+            });
+            plot_rect = Some(inner.response.rect);
+        });
     }
 }
 
@@ -50,5 +81,14 @@ fn main() {
     thread::sleep(Duration::from_secs(1));
 
     let storage_endpoint = Arc::clone(&storage);
-    dbg!(storage_endpoint.lock().unwrap().store[0][0]);
+    return eframe::run_native(
+        "My egui App with a plot",
+        eframe::NativeOptions::default(),
+        Box::new(|_cc| {
+            Ok(Box::new(MyApp {
+                storage: storage_endpoint,
+            }))
+        }),
+    )
+    .expect("app");
 }
