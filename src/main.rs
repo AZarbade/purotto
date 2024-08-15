@@ -35,7 +35,6 @@ fn stdin_processer(storage: Arc<Mutex<dataset::DataStore>>, rx: Receiver<Vec<f32
                 .expect("ERROR: failed to acquire lock on storage")
                 .add_entry(rx);
         }
-        dbg!(&storage);
     }
 }
 
@@ -63,6 +62,7 @@ impl eframe::App for MyApp {
                 plot_ui.line(self.data_line(1));
             });
             plot_rect = Some(inner.response.rect);
+            ui.ctx().request_repaint();
         });
     }
 }
