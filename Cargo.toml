@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+bus = "2.4.1"
 eframe = "0.28.1"
 egui_plot = "0.28.1"
