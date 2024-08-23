@@ -1,48 +1,74 @@
-#![allow(dead_code, unused)]
-use bus::{Bus, BusReader};
 use eframe::egui;
-use egui_plot::{Legend, Line, LineStyle, Plot, PlotPoints};
-use std::collections::VecDeque;
+use egui_plot::{Line, Plot, PlotPoints};
+use std::collections::HashMap;
 use std::io::{self, BufRead};
 use std::sync::{Arc, Mutex};
-use std::thread;
+use std::thread::{self, JoinHandle};
 
-fn read_stdin() -> BusReader<Vec<f64>> {
-    let mut bus = Bus::new(100);
-    let mut rx_main = bus.add_rx();
+const DEBUG: bool = true;
 
-    let stdin = io::stdin();
-    let broadcast_handle = thread::spawn(move || {
+// [[ 1 2 3 4 ]
+//  [ 1 2 3 4 ]
+//  [ 1 2 3 4 ]
+//  [ 1 2 3 4 ]]
+//
+// into this...
+//
+//  [ 1 1 1 1 ]
+//  [ 2 2 2 2 ]
+//  [ 3 3 3 3 ]
+//  [ 4 4 4 4 ]
+
+fn stdin_parser(stdin: io::Stdin) -> (Arc<Mutex<HashMap<usize, Vec<f64>>>>, JoinHandle<()>) {
+    let streams: Arc<Mutex<HashMap<usize, Vec<f64>>>> = Arc::new(Mutex::new(HashMap::new()));
+    let streams_clone = Arc::clone(&streams);
+    let reader_handle = thread::spawn(move || {
         for line in stdin.lock().lines() {
             if let Ok(line) = line {
-                let data: Vec<f64> = line
+                let values: Vec<f64> = line
                     .split_whitespace()
                     .filter_map(|x| x.parse::<f64>().ok())
                     .collect();
-                if !data.is_empty() {
-                    bus.broadcast(data);
+
+                if !values.is_empty() {
+                    for (i, &val) in values.iter().enumerate() {
+                        streams
+                            .lock()
+                            .unwrap()
+                            .entry(i)
+                            .or_insert_with(Vec::new)
+                            .push(val);
+                    }
+
+                    if DEBUG {
+                        eprintln!("-----------");
+                        for (i, stream) in streams.lock().unwrap().iter() {
+                            eprintln!("[STDIN_READER]\tStream {}: {:?}", i, stream);
+                        }
+                    }
                 }
             }
         }
     });
-
-    return rx_main;
+    return (streams_clone, reader_handle);
 }
 
 #[derive(Default)]
-struct MainApp {
-    data: Vec<f64>,
+struct MyApp {
+    payload: Arc<Mutex<HashMap<usize, Vec<f64>>>>,
 }
 
-impl eframe::App for MainApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+impl eframe::App for MyApp {
+    fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
         let mut plot_rect = None;
         egui::CentralPanel::default().show(ctx, |ui| {
-            let my_plot = Plot::new("My Plot").legend(Legend::default());
+            ui.heading("PLOTTING");
 
-            let line = Line::new(PlotPoints::from_ys_f64(&self.data));
+            let my_plot = Plot::new("my plot");
+            let data = self.payload.lock().unwrap();
+            let stream = data.get(&0).unwrap();
             let inner = my_plot.show(ui, |plot_ui| {
-                plot_ui.line(line);
+                plot_ui.line(Line::new(PlotPoints::from_ys_f64(&stream[..])));
             });
 
             plot_rect = Some(inner.response.rect);
@@ -52,19 +78,18 @@ impl eframe::App for MainApp {
 }
 
 fn main() {
-    let stream = Arc::new(Mutex::new(Vec::<f64>::new()));
-    let stream_clone = Arc::clone(&stream);
-    thread::spawn(move || {
-        let mut rx = read_stdin();
-        loop {
-            let val = rx.recv().unwrap()[0];
-            stream.lock().unwrap().push(val);
-            dbg!(&stream);
-        }
-    });
+    let mut thread_handles: Vec<JoinHandle<()>> = Vec::new();
+    let stdin = io::stdin();
+    let (data, read_handle) = stdin_parser(stdin);
+    thread_handles.push(read_handle);
 
-    let applet = Box::<MainApp>::new(MainApp {
-        data: stream_clone.lock().unwrap().clone(),
+    if DEBUG {
+        std::thread::sleep_ms(2000);
+        println!("[MAIN]\t{:?}", data.lock().unwrap().get(&0).unwrap());
+    }
+
+    let applet = Box::<MyApp>::new(MyApp {
+        payload: data,
         ..Default::default()
     });
 
@@ -74,4 +99,8 @@ fn main() {
         Box::new(|_cc| Ok(applet)),
     )
     .unwrap();
+
+    for handle in thread_handles {
+        handle.join().unwrap();
+    }
 }
