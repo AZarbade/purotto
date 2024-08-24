@@ -6,4 +6,3 @@ edition = "2021"
 [dependencies]
 eframe = "0.28.1"
 egui_plot = "0.28.1"
-spmc = "0.3.0"
