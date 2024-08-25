@@ -4,6 +4,7 @@ mod reader;
 use crate::datacontainer::DataContainer;
 use eframe::egui;
 use egui_plot::{Legend, Line, Plot};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 #[derive(Default)]
@@ -15,6 +16,7 @@ struct MyAppConfig {
 struct App {
     payload: Arc<Mutex<DataContainer>>,
     config: MyAppConfig,
+    plot_tracker: HashMap<String, bool>,
 }
 
 impl App {
@@ -22,7 +24,7 @@ impl App {
         let data = self.payload.lock().unwrap();
         let my_plot = Plot::new("My Plot").legend(Legend::default());
         let _inner = my_plot.show(ui, |ui| {
-            ui.line(Line::new(data.get_plotpoints(index)).name("curve"));
+            ui.line(Line::new(data.get_plotpoints(index)).name(format!("Stream_{index}")));
         });
     }
 
@@ -34,12 +36,8 @@ impl App {
                     ui.add(egui::widgets::Label::new("Plotter"));
                 });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let close_btn = ui.add(egui::Button::new("close"));
+                    let close_btn = ui.add(egui::Button::new("\u{274C}"));
                     if close_btn.clicked() {
-                        todo!();
-                    }
-                    let refresh_btn = ui.add(egui::Button::new("refresh"));
-                    if refresh_btn.clicked() {
                         todo!();
                     }
                     let theme_btn = ui.add(egui::Button::new("change theme"));
@@ -52,16 +50,30 @@ impl App {
         });
     }
 
-    fn render_left_panel(&self, ctx: &egui::Context) {
+    fn render_left_panel(&mut self, ctx: &egui::Context) {
         egui::SidePanel::left("left panel").show(ctx, |ui| {
             ui.add_space(10.);
             ui.label("Available Streams");
             ui.separator();
-            let stream_count = self.payload.lock().unwrap().stream_count;
-            for i in 0..stream_count {
-                ui.add(egui::Button::new(format!("Stream_{i}")));
-            }
+            self.create_stream_toggles(ui);
         });
+    }
+
+    fn create_stream_toggles(&mut self, ui: &mut egui::Ui) {
+        let stream_count = self.payload.lock().unwrap().stream_count;
+
+        if self.plot_tracker.is_empty() {
+            for i in 0..stream_count {
+                self.plot_tracker.insert(format!("Stream_{i}"), false);
+            }
+        }
+
+        for i in 0..stream_count {
+            let stream_key = format!("Stream_{i}");
+            if let Some(is_plotted) = self.plot_tracker.get_mut(&stream_key) {
+                ui.add(egui::Checkbox::new(is_plotted, &stream_key));
+            }
+        }
     }
 }
 
@@ -76,8 +88,13 @@ impl eframe::App for App {
         self.render_top_panel(ctx);
         self.render_left_panel(ctx);
         egui::CentralPanel::default().show(ctx, |ui| {
-            self.render_plot(ui, 0);
-            ctx.request_repaint();
+            let stream_count = self.payload.lock().unwrap().stream_count;
+            for i in 0..stream_count {
+                let stream_key = format!("Stream_{i}");
+                if let Some(true) = self.plot_tracker.get_mut(&stream_key) {
+                    self.render_plot(ui, i);
+                }
+            }
         });
     }
 }
@@ -91,6 +108,7 @@ fn main() {
     let applet = Box::<App>::new(App {
         payload: data,
         config: MyAppConfig::default(),
+        ..Default::default()
     });
 
     eframe::run_native(
