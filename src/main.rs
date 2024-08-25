@@ -1,94 +1,119 @@
+mod datacontainer;
+mod reader;
+mod wrap_app;
+
+use crate::datacontainer::DataContainer;
 use eframe::egui;
-use egui_plot::{Legend, Line, Plot, PlotPoints};
-use std::io::{self, BufRead, Stdin};
-use std::sync::{
-    mpsc::{channel, Receiver},
-    Arc, Mutex,
-};
-use std::thread;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::thread::JoinHandle;
 
-mod dataset;
-
-fn stdin_reader(stdin: Stdin) -> Receiver<Vec<f32>> {
-    let (tx, rx) = channel();
-    thread::spawn(move || {
-        for line in stdin.lock().lines() {
-            if let Ok(line) = line {
-                let data: Vec<f32> = line
-                    .split_whitespace()
-                    .filter_map(|x| x.parse::<f32>().ok())
-                    .collect();
-                if !data.is_empty() {
-                    tx.send(data).unwrap();
-                }
-            }
-        }
-    });
-    return rx;
-}
-
-fn stdin_processer(storage: Arc<Mutex<dataset::DataStore>>, rx: Receiver<Vec<f32>>) {
-    loop {
-        if let Ok(rx) = rx.recv() {
-            storage
-                .lock()
-                .expect("ERROR: failed to acquire lock on storage")
-                .add_entry(rx);
-        }
-    }
+#[derive(Default)]
+struct AppConfig {
+    dark_mode: bool,
 }
 
 #[derive(Default)]
-struct MyApp {
-    storage: Arc<Mutex<dataset::DataStore>>,
+struct App {
+    payload: Arc<Mutex<DataContainer>>,
+    config: AppConfig,
+    plot_tracker: HashMap<String, bool>,
 }
 
-impl MyApp {
-    fn data_line(&self, index: usize) -> Line {
-        return Line::new(PlotPoints::from_ys_f32(
-            &self.storage.lock().unwrap().get_stream(index),
-        ));
+impl App {
+    fn render_top_panel(&mut self, ctx: &egui::Context) {
+        egui::TopBottomPanel::top("top panel").show(ctx, |ui| {
+            ui.add_space(10.);
+            egui::menu::bar(ui, |ui| {
+                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    ui.add(egui::widgets::Label::new("Plotter"));
+                });
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let close_btn = ui.add(egui::Button::new("\u{274C}"));
+                    if close_btn.clicked() {
+                        todo!();
+                    }
+                    let theme_btn = ui.add(egui::Button::new("change theme"));
+                    if theme_btn.clicked() {
+                        self.config.dark_mode = !self.config.dark_mode;
+                    }
+                });
+            });
+            ui.add_space(10.);
+        });
+    }
+
+    fn render_left_panel(&mut self, ctx: &egui::Context) {
+        egui::SidePanel::left("left panel").show(ctx, |ui| {
+            ui.add_space(10.);
+            ui.label("Available Streams");
+            ui.separator();
+            self.create_stream_toggles(ui);
+        });
+    }
+
+    fn create_stream_toggles(&mut self, ui: &mut egui::Ui) {
+        let stream_count = self.payload.lock().unwrap().stream_count;
+        if self.plot_tracker.is_empty() {
+            for i in 0..stream_count {
+                self.plot_tracker.insert(format!("Stream_{i}"), false);
+            }
+        }
+        for i in 0..stream_count {
+            let stream_key = format!("Stream_{i}");
+            if let Some(is_plotted) = self.plot_tracker.get_mut(&stream_key) {
+                ui.add(egui::Checkbox::new(is_plotted, &stream_key));
+            }
+        }
     }
 }
 
-impl eframe::App for MyApp {
+impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let mut plot_rect = None;
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("Value Plotting");
+        if self.config.dark_mode {
+            ctx.set_visuals(egui::Visuals::dark());
+        } else {
+            ctx.set_visuals(egui::Visuals::light());
+        }
 
-            let plot = Plot::new("Plot").legend(Legend::default());
-            let inner = plot.show(ui, |plot_ui| {
-                plot_ui.line(self.data_line(1));
-            });
-            plot_rect = Some(inner.response.rect);
-            ui.ctx().request_repaint();
+        self.render_top_panel(ctx);
+        self.render_left_panel(ctx);
+        egui::CentralPanel::default().show(ctx, |_| {
+            let stream_count = self.payload.lock().unwrap().stream_count;
+            for i in 0..stream_count {
+                let stream_key = format!("Stream_{i}");
+                if let Some(is_plotted) = self.plot_tracker.get_mut(&stream_key) {
+                    if *is_plotted {
+                        let data = self.payload.lock().unwrap().get_plotpoints(i);
+                        let mut inner_applets = wrap_app::MovingStrings { stream_index: i };
+                        inner_applets.show(ctx, data);
+                    }
+                }
+            }
         });
     }
 }
 
 fn main() {
-    let storage = Arc::new(Mutex::new(dataset::DataStore::new()));
-    let storage_socket = Arc::clone(&storage);
-    thread::spawn(move || {
-        let stdin = stdin_reader(io::stdin());
-        stdin_processer(storage_socket, stdin);
+    let mut thread_handles: Vec<JoinHandle<()>> = Vec::new();
+    let stdin = std::io::stdin();
+    let (data, read_handle) = reader::stdin_parser(stdin);
+    thread_handles.push(read_handle);
+
+    let applet = Box::<App>::new(App {
+        payload: data,
+        config: AppConfig::default(),
+        ..Default::default()
     });
 
-    // FIX: use different method for this
-    // - sleeping to let data flow in storage
-    use std::time::Duration;
-    thread::sleep(Duration::from_secs(1));
-
-    let storage_endpoint = Arc::clone(&storage);
-    return eframe::run_native(
+    eframe::run_native(
         "My egui App with a plot",
         eframe::NativeOptions::default(),
-        Box::new(|_cc| {
-            Ok(Box::new(MyApp {
-                storage: storage_endpoint,
-            }))
-        }),
+        Box::new(|_cc| Ok(applet)),
     )
-    .expect("app");
+    .unwrap();
+
+    for handle in thread_handles {
+        handle.join().unwrap();
+    }
 }
