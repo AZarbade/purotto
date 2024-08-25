@@ -1,33 +1,26 @@
 mod datacontainer;
 mod reader;
+mod wrap_app;
 
 use crate::datacontainer::DataContainer;
 use eframe::egui;
-use egui_plot::{Legend, Line, Plot};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::thread::JoinHandle;
 
 #[derive(Default)]
-struct MyAppConfig {
+struct AppConfig {
     dark_mode: bool,
 }
 
 #[derive(Default)]
 struct App {
     payload: Arc<Mutex<DataContainer>>,
-    config: MyAppConfig,
+    config: AppConfig,
     plot_tracker: HashMap<String, bool>,
 }
 
 impl App {
-    fn render_plot(&self, ui: &mut egui::Ui, index: usize) {
-        let data = self.payload.lock().unwrap();
-        let my_plot = Plot::new("My Plot").legend(Legend::default());
-        let _inner = my_plot.show(ui, |ui| {
-            ui.line(Line::new(data.get_plotpoints(index)).name(format!("Stream_{index}")));
-        });
-    }
-
     fn render_top_panel(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::top("top panel").show(ctx, |ui| {
             ui.add_space(10.);
@@ -61,13 +54,11 @@ impl App {
 
     fn create_stream_toggles(&mut self, ui: &mut egui::Ui) {
         let stream_count = self.payload.lock().unwrap().stream_count;
-
         if self.plot_tracker.is_empty() {
             for i in 0..stream_count {
                 self.plot_tracker.insert(format!("Stream_{i}"), false);
             }
         }
-
         for i in 0..stream_count {
             let stream_key = format!("Stream_{i}");
             if let Some(is_plotted) = self.plot_tracker.get_mut(&stream_key) {
@@ -87,12 +78,16 @@ impl eframe::App for App {
 
         self.render_top_panel(ctx);
         self.render_left_panel(ctx);
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().show(ctx, |_| {
             let stream_count = self.payload.lock().unwrap().stream_count;
             for i in 0..stream_count {
                 let stream_key = format!("Stream_{i}");
-                if let Some(true) = self.plot_tracker.get_mut(&stream_key) {
-                    self.render_plot(ui, i);
+                if let Some(is_plotted) = self.plot_tracker.get_mut(&stream_key) {
+                    if *is_plotted {
+                        let data = self.payload.lock().unwrap().get_plotpoints(i);
+                        let mut inner_applets = wrap_app::MovingStrings { stream_index: i };
+                        inner_applets.show(ctx, data);
+                    }
                 }
             }
         });
@@ -100,14 +95,14 @@ impl eframe::App for App {
 }
 
 fn main() {
-    let mut thread_handles: Vec<std::thread::JoinHandle<()>> = Vec::new();
+    let mut thread_handles: Vec<JoinHandle<()>> = Vec::new();
     let stdin = std::io::stdin();
     let (data, read_handle) = reader::stdin_parser(stdin);
     thread_handles.push(read_handle);
 
     let applet = Box::<App>::new(App {
         payload: data,
-        config: MyAppConfig::default(),
+        config: AppConfig::default(),
         ..Default::default()
     });
 
