@@ -1,35 +1,46 @@
+#![allow(dead_code)]
+
+use crate::datacontainer::DataContainer;
 use eframe::egui::{self, vec2};
-use egui_plot::{Line, Plot, PlotPoints};
+use egui_plot::{Line, Plot};
+use std::sync::{Arc, Mutex};
 
 // ----------------------------------------------------------------------------
 
 #[derive(Default)]
-pub struct MovingStrings {
-    pub stream_index: usize,
+pub struct Showcase {
+    pub data: Arc<Mutex<DataContainer>>,
 }
 
-impl MovingStrings {
+impl Showcase {
     fn name(&self) -> &str {
-        "Moving Strings"
+        "Showcase"
     }
 
-    pub fn show(&mut self, ctx: &egui::Context, data: PlotPoints) {
+    pub fn show(&mut self, ctx: &egui::Context) {
         egui::Window::new(self.name())
             .default_size(vec2(512., 256.))
             .vscroll(false)
-            .show(ctx, |ui| self.ui(ui, data));
+            .show(ctx, |ui| self.ui(ui));
     }
 
-    fn ui(&mut self, ui: &mut egui::Ui, data: PlotPoints) {
+    fn ui(&mut self, ui: &mut egui::Ui) {
         egui::Frame::canvas(ui.style()).show(ui, |ui| {
             ui.ctx().request_repaint();
-            self.render_plot(ui, data);
-        });
-    }
-
-    fn render_plot(&self, ui: &mut egui::Ui, data: PlotPoints) {
-        Plot::new("stream").show(ui, |ui| {
-            ui.line(Line::new(data).name(format!("Stream_{}", self.stream_index)));
+            let payload = self.data.lock().unwrap();
+            let stream_count = payload.stream_count;
+            for index in 0..stream_count {
+                let stream_key = format!("Stream_{index}");
+                if let Some(is_plotted) = payload.plot_tracker.get(&stream_key) {
+                    if *is_plotted {
+                        let data = payload.get_plotpoints(index);
+                        let plot = Plot::new("plot").view_aspect(2.0);
+                        plot.show(ui, |ui| {
+                            ui.line(Line::new(data));
+                        });
+                    }
+                }
+            }
         });
     }
 }

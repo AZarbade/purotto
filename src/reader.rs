@@ -5,10 +5,10 @@ use std::thread::{self, JoinHandle};
 
 pub fn stdin_parser(stdin: io::Stdin) -> (Arc<Mutex<DataContainer>>, JoinHandle<()>) {
     let streams = Arc::new(Mutex::new(DataContainer {
+        look_back: 250,
         ..Default::default()
     }));
     let streams_clone = Arc::clone(&streams);
-    let mut look_back = 0;
     let reader_handle = thread::spawn(move || {
         for line in stdin.lock().lines() {
             let values: Vec<f64> = line
@@ -20,11 +20,7 @@ pub fn stdin_parser(stdin: io::Stdin) -> (Arc<Mutex<DataContainer>>, JoinHandle<
             if !values.is_empty() {
                 streams.lock().unwrap().stream_count = values.len();
                 for (i, &val) in values.iter().enumerate() {
-                    // ignore initial (5) values
-                    if look_back >= 5 {
-                        streams.lock().unwrap().append_values(i, val);
-                    }
-                    look_back += 1;
+                    streams.lock().unwrap().append_values(i, val);
                 }
             }
         }
