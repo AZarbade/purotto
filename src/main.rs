@@ -1,6 +1,5 @@
 mod datacontainer;
 mod reader;
-mod wrap_app;
 
 use crate::datacontainer::DataContainer;
 use eframe::egui;
