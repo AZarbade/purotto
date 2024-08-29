@@ -71,7 +71,7 @@ impl App {
                     egui::Window::new("").id(stream_id).show(ctx, |ui| {
                         ui.ctx().request_repaint();
                         let data = payload.get_plotpoints(index);
-                        let plot = Plot::new("plot").view_aspect(2.0);
+                        let plot = Plot::new("plot");
                         plot.show(ui, |ui| {
                             ui.line(Line::new(data));
                         });
