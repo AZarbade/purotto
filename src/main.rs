@@ -40,6 +40,20 @@ impl App {
         });
     }
 
+    fn render_bottom_panel(&mut self, ctx: &egui::Context) {
+        egui::TopBottomPanel::bottom("bottom panel").show(ctx, |ui| {
+            ui.add_space(10.);
+            egui::menu::bar(ui, |ui| {
+                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    if ui.button("Auto Organize").clicked() {
+                        ui.ctx().memory_mut(|mem| mem.reset_areas());
+                    }
+                });
+            });
+            ui.add_space(10.);
+        });
+    }
+
     fn render_left_panel(&mut self, ctx: &egui::Context) {
         egui::SidePanel::left("left panel").show(ctx, |ui| {
             ui.add_space(10.);
@@ -100,6 +114,7 @@ impl eframe::App for App {
         egui::CentralPanel::default().show(ctx, |_| {
             self.render_top_panel(ctx);
             self.render_left_panel(ctx);
+            self.render_bottom_panel(ctx);
             self.render_plot(ctx);
         });
     }
