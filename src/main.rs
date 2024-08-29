@@ -59,23 +59,24 @@ impl App {
     }
 
     pub fn render_plot(&mut self, ctx: &egui::Context) {
-        egui::Window::new("").show(ctx, |ui| {
-            ui.ctx().request_repaint();
-            let payload = self.payload.lock().unwrap();
-            let stream_count = payload.stream_count;
-            for index in 0..stream_count {
-                let stream_key = format!("Stream_{index}");
-                if let Some(is_plotted) = payload.plot_tracker.get(&stream_key) {
-                    if *is_plotted {
+        let payload = self.payload.lock().unwrap();
+        let stream_count = payload.stream_count;
+        for index in 0..stream_count {
+            let stream_key = format!("Stream_{index}");
+            if let Some(is_plotted) = payload.plot_tracker.get(&stream_key) {
+                if *is_plotted {
+                    let stream_id = egui::Id::new(stream_key);
+                    egui::Window::new("").id(stream_id).show(ctx, |ui| {
+                        ui.ctx().request_repaint();
                         let data = payload.get_plotpoints(index);
                         let plot = Plot::new("plot").view_aspect(2.0);
                         plot.show(ui, |ui| {
                             ui.line(Line::new(data));
                         });
-                    }
+                    });
                 }
             }
-        });
+        }
     }
 }
 
