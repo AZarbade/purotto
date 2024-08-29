@@ -1,23 +1,18 @@
 mod datacontainer;
 mod reader;
-mod wrap_app;
 
 use crate::datacontainer::DataContainer;
 use eframe::egui;
-use std::collections::HashMap;
+use egui_plot::{Line, Plot};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 
 #[derive(Default)]
-struct AppConfig {
-    dark_mode: bool,
-}
-
-#[derive(Default)]
 struct App {
     payload: Arc<Mutex<DataContainer>>,
-    config: AppConfig,
-    plot_tracker: HashMap<String, bool>,
+    // config options
+    label: String,
+    dark_mode: bool,
 }
 
 impl App {
@@ -26,16 +21,18 @@ impl App {
             ui.add_space(10.);
             egui::menu::bar(ui, |ui| {
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                    ui.add(egui::widgets::Label::new("Plotter"));
+                    ui.add(egui::widgets::Label::new(&self.label));
                 });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let close_btn = ui.add(egui::Button::new("\u{274C}"));
+                    let close_btn =
+                        ui.add(egui::Button::new(egui_phosphor::regular::X.to_string()));
                     if close_btn.clicked() {
                         todo!();
                     }
-                    let theme_btn = ui.add(egui::Button::new("change theme"));
+                    let theme_btn =
+                        ui.add(egui::Button::new(egui_phosphor::regular::SUN.to_string()));
                     if theme_btn.clicked() {
-                        self.config.dark_mode = !self.config.dark_mode;
+                        self.dark_mode = !self.dark_mode;
                     }
                 });
             });
@@ -53,16 +50,33 @@ impl App {
     }
 
     fn create_stream_toggles(&mut self, ui: &mut egui::Ui) {
-        let stream_count = self.payload.lock().unwrap().stream_count;
-        if self.plot_tracker.is_empty() {
-            for i in 0..stream_count {
-                self.plot_tracker.insert(format!("Stream_{i}"), false);
+        let mut payload = self.payload.lock().unwrap();
+        payload.update_tracker();
+        for i in 0..payload.stream_count {
+            let stream_key = format!("Stream_{i}");
+            if let Some(is_enabled) = payload.plot_tracker.get_mut(&stream_key) {
+                ui.add(egui::Checkbox::new(is_enabled, &stream_key));
             }
         }
-        for i in 0..stream_count {
-            let stream_key = format!("Stream_{i}");
-            if let Some(is_plotted) = self.plot_tracker.get_mut(&stream_key) {
-                ui.add(egui::Checkbox::new(is_plotted, &stream_key));
+    }
+
+    pub fn render_plot(&mut self, ctx: &egui::Context) {
+        let payload = self.payload.lock().unwrap();
+        let stream_count = payload.stream_count;
+        for index in 0..stream_count {
+            let stream_key = format!("Stream_{index}");
+            if let Some(is_plotted) = payload.plot_tracker.get(&stream_key) {
+                if *is_plotted {
+                    let stream_id = egui::Id::new(stream_key);
+                    egui::Window::new("").id(stream_id).show(ctx, |ui| {
+                        ui.ctx().request_repaint();
+                        let data = payload.get_plotpoints(index);
+                        let plot = Plot::new("plot");
+                        plot.show(ui, |ui| {
+                            ui.line(Line::new(data));
+                        });
+                    });
+                }
             }
         }
     }
@@ -70,26 +84,20 @@ impl App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        if self.config.dark_mode {
+        let mut fonts = egui::FontDefinitions::default();
+        egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
+        ctx.set_fonts(fonts);
+
+        if self.dark_mode {
             ctx.set_visuals(egui::Visuals::dark());
         } else {
             ctx.set_visuals(egui::Visuals::light());
         }
 
-        self.render_top_panel(ctx);
-        self.render_left_panel(ctx);
         egui::CentralPanel::default().show(ctx, |_| {
-            let stream_count = self.payload.lock().unwrap().stream_count;
-            for i in 0..stream_count {
-                let stream_key = format!("Stream_{i}");
-                if let Some(is_plotted) = self.plot_tracker.get_mut(&stream_key) {
-                    if *is_plotted {
-                        let data = self.payload.lock().unwrap().get_plotpoints(i);
-                        let mut inner_applets = wrap_app::MovingStrings { stream_index: i };
-                        inner_applets.show(ctx, data);
-                    }
-                }
-            }
+            self.render_top_panel(ctx);
+            self.render_left_panel(ctx);
+            self.render_plot(ctx);
         });
     }
 }
@@ -102,7 +110,7 @@ fn main() {
 
     let applet = Box::<App>::new(App {
         payload: data,
-        config: AppConfig::default(),
+        label: "Some nice name".to_string(),
         ..Default::default()
     });
 
