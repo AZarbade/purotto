@@ -24,11 +24,13 @@ impl App {
                     ui.add(egui::widgets::Label::new(&self.label));
                 });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let close_btn = ui.add(egui::Button::new("close"));
+                    let close_btn =
+                        ui.add(egui::Button::new(egui_phosphor::regular::X.to_string()));
                     if close_btn.clicked() {
                         todo!();
                     }
-                    let theme_btn = ui.add(egui::Button::new("change theme"));
+                    let theme_btn =
+                        ui.add(egui::Button::new(egui_phosphor::regular::SUN.to_string()));
                     if theme_btn.clicked() {
                         self.dark_mode = !self.dark_mode;
                     }
@@ -82,6 +84,10 @@ impl App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let mut fonts = egui::FontDefinitions::default();
+        egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
+        ctx.set_fonts(fonts);
+
         if self.dark_mode {
             ctx.set_visuals(egui::Visuals::dark());
         } else {
