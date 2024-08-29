@@ -2,3 +2,8 @@
 name = "serialplotter-rs"
 version = "0.1.0"
 edition = "2021"
+
+[dependencies]
+eframe = "0.28.1"
+egui-phosphor = "0.6.0"
+egui_plot = "0.28.1"
