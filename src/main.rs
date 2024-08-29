@@ -2,7 +2,7 @@ mod datacontainer;
 mod reader;
 
 use crate::datacontainer::DataContainer;
-use eframe::egui;
+use eframe::egui::{self, vec2};
 use egui_plot::{Line, Plot};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
@@ -68,14 +68,17 @@ impl App {
             if let Some(is_plotted) = payload.plot_tracker.get(&stream_key) {
                 if *is_plotted {
                     let stream_id = egui::Id::new(stream_key);
-                    egui::Window::new("").id(stream_id).show(ctx, |ui| {
-                        ui.ctx().request_repaint();
-                        let data = payload.get_plotpoints(index);
-                        let plot = Plot::new("plot");
-                        plot.show(ui, |ui| {
-                            ui.line(Line::new(data));
+                    egui::Window::new("")
+                        .id(stream_id)
+                        .default_size(vec2(512., 256.))
+                        .show(ctx, |ui| {
+                            ui.ctx().request_repaint();
+                            let data = payload.get_plotpoints(index);
+                            let plot = Plot::new("plot");
+                            plot.show(ui, |ui| {
+                                ui.line(Line::new(data));
+                            });
                         });
-                    });
                 }
             }
         }

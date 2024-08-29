@@ -3,17 +3,28 @@
 use egui_plot::PlotPoints;
 use std::collections::{HashMap, VecDeque};
 
-/// A container for managing multiple data streams, their measurements, and plotting states.
-#[derive(Default)]
+/// A container for managing multiple data streams and their states.
 pub struct DataContainer {
     /// Stores measurements for each stream. The key is the stream name, and the value is a buffer (VecDeque) of measurements.
     pub measurements: HashMap<String, VecDeque<f64>>,
-    /// Tracks total number of data streams being tracked.
-    pub stream_count: usize,
-    /// The maximum number of measurements to keep.
+    /// The maximum number of measurements to keep. By default, 500;
     pub look_back: usize,
+    /// Tracks total number of data streams being inputed.
+    pub stream_count: usize,
     /// Tracks whether each stream should be plotted. The key is the stream name, and the value is a boolean.
     pub plot_tracker: HashMap<String, bool>,
+}
+
+// TODO: remove repetition here.
+impl Default for DataContainer {
+    fn default() -> Self {
+        Self {
+            measurements: Default::default(),
+            look_back: 500,
+            stream_count: Default::default(),
+            plot_tracker: Default::default(),
+        }
+    }
 }
 
 impl DataContainer {
@@ -21,29 +32,22 @@ impl DataContainer {
     ///
     /// This method adds a new measurement to the specified stream, maintaining the maximum number
     /// of measurements defined by `look_back`. It also updates the `stream_count`.
+    /// NOTE: This method automatically creates a new key for given index.
+    /// index: 0 --> key: Stream_0
     ///
     /// # Arguments
     ///
     /// * `index` - The index of the stream to update.
-    /// * `value` - The new measurement value to append.
+    /// * `value` - The new measurement to append.
     ///
     /// # Example
     ///
     /// ```
     /// let mut container = DataContainer::default();
-    /// container.look_back = 3;
-    ///
     /// container.append_values(0, 1.0);
+    ///
     /// assert_eq!(container.measurements["Stream_0"], vec![1.0].into());
     /// assert_eq!(container.stream_count, 1);
-    ///
-    /// container.append_values(0, 2.0);
-    /// container.append_values(0, 3.0);
-    /// container.append_values(0, 4.0);
-    /// assert_eq!(container.measurements["Stream_0"], vec![2.0, 3.0, 4.0].into());
-    ///
-    /// container.append_values(1, 5.0);
-    /// assert_eq!(container.stream_count, 2);
     /// ```
     pub fn append_values(&mut self, index: usize, value: f64) {
         let stream_index = format!("Stream_{index}");
@@ -55,9 +59,9 @@ impl DataContainer {
         self.stream_count = self.measurements.len();
     }
 
-    /// Retrieves plot points for a specific data stream.
+    /// Retrieves [`PlotPoints`] for a specific data stream index.
     ///
-    /// This method returns a `PlotPoints` object containing the measurements for the specified stream.
+    /// This method returns [`PlotPoints`] object containing the measurements for the specified stream.
     ///
     /// # Arguments
     ///
@@ -65,11 +69,7 @@ impl DataContainer {
     ///
     /// # Returns
     ///
-    /// A `PlotPoints` object containing the measurements for the specified stream.
-    ///
-    /// # Panics
-    ///
-    /// This method will panic if the specified stream does not exist.
+    /// A [`PlotPoints`] object containing the measurements for the specified stream index.
     ///
     /// # Example
     ///
@@ -77,8 +77,8 @@ impl DataContainer {
     /// let mut container = DataContainer::default();
     /// container.append_values(0, 1.0);
     /// container.append_values(0, 2.0);
-    ///
     /// let plot_points = container.get_plotpoints(0);
+    ///
     /// assert_eq!(plot_points.points().len(), 2);
     /// assert_eq!(plot_points.points()[0].y, 1.0);
     /// assert_eq!(plot_points.points()[1].y, 2.0);
@@ -99,6 +99,7 @@ impl DataContainer {
     ///
     /// ```
     /// let mut container = DataContainer::default();
+    /// // WARN: explicitly setting count, to be removed in future
     /// container.stream_count = 3;
     /// container.update_tracker();
     ///

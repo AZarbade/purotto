@@ -7,7 +7,7 @@ use std::thread::{self, JoinHandle};
 
 /// Parses standard input and returns custom [`DataContainer`] with a thread handle.
 ///
-/// This function creates a new `DataContainer` wrapped in an `Arc<Mutex<>>` for thread-safe
+/// This method creates a new [`DataContainer`] wrapped in an [`Arc<Mutex<>>`] for thread-safe
 /// access. It spawns a new thread that continuously reads from stdin, parses each line
 /// into floating-point values, and appends these values to the appropriate streams in
 /// the [`DataContainer`].
@@ -25,11 +25,6 @@ use std::thread::{self, JoinHandle};
 /// # Example
 ///
 /// ```
-/// use std::io;
-/// use std::sync::Arc;
-/// use std::thread;
-/// use std::time::Duration;
-///
 /// // Simulate stdin input
 /// thread::spawn(|| {
 ///     println!("1.0 2.0 3.0");
