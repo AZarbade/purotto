@@ -20,9 +20,8 @@ This is mainly designed to work with serial outputs of micro-controllers. Check 
 
 ## 🎮 Usage
 
-- micro-controller should print to serial output in following format,
-    {data_stream} {data_stream} {data_stream} ...
-                 ^ _space seperated_
+- micro-controller should print to serial output in following format,\
+    {data_stream} {data_stream} {data_stream} ...\
 - Any and all strings in serial output are parsed _out_, and only integers are collected
 - data streams should be values, NOT strings. 
 - `cat /dev/tty_your_device_here | cargo run`: pipe in your data streams.
