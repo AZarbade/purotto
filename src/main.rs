@@ -2,7 +2,7 @@ mod datacontainer;
 mod reader;
 
 use crate::datacontainer::DataContainer;
-use eframe::egui;
+use eframe::egui::{self, vec2};
 use egui_plot::{Line, Plot};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
@@ -40,6 +40,20 @@ impl App {
         });
     }
 
+    fn render_bottom_panel(&mut self, ctx: &egui::Context) {
+        egui::TopBottomPanel::bottom("bottom panel").show(ctx, |ui| {
+            ui.add_space(10.);
+            egui::menu::bar(ui, |ui| {
+                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    if ui.button("Auto Organize").clicked() {
+                        ui.ctx().memory_mut(|mem| mem.reset_areas());
+                    }
+                });
+            });
+            ui.add_space(10.);
+        });
+    }
+
     fn render_left_panel(&mut self, ctx: &egui::Context) {
         egui::SidePanel::left("left panel").show(ctx, |ui| {
             ui.add_space(10.);
@@ -68,14 +82,17 @@ impl App {
             if let Some(is_plotted) = payload.plot_tracker.get(&stream_key) {
                 if *is_plotted {
                     let stream_id = egui::Id::new(stream_key);
-                    egui::Window::new("").id(stream_id).show(ctx, |ui| {
-                        ui.ctx().request_repaint();
-                        let data = payload.get_plotpoints(index);
-                        let plot = Plot::new("plot");
-                        plot.show(ui, |ui| {
-                            ui.line(Line::new(data));
+                    egui::Window::new("")
+                        .id(stream_id)
+                        .default_size(vec2(512., 256.))
+                        .show(ctx, |ui| {
+                            ui.ctx().request_repaint();
+                            let data = payload.get_plotpoints(index);
+                            let plot = Plot::new("plot");
+                            plot.show(ui, |ui| {
+                                ui.line(Line::new(data));
+                            });
                         });
-                    });
                 }
             }
         }
@@ -97,6 +114,7 @@ impl eframe::App for App {
         egui::CentralPanel::default().show(ctx, |_| {
             self.render_top_panel(ctx);
             self.render_left_panel(ctx);
+            self.render_bottom_panel(ctx);
             self.render_plot(ctx);
         });
     }
