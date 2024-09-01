@@ -2183,6 +2183,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43d84d1d7a6ac92673717f9f6d1518374ef257669c24ebc5ac25d5033828be58"
 
 [[package]]
+name = "purotto"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "egui-phosphor",
+ "egui_plot",
+]
+
+[[package]]
 name = "quick-xml"
 version = "0.34.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2400,15 +2409,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.74",
-]
-
-[[package]]
-name = "serialplotter-rs"
-version = "0.1.0"
-dependencies = [
- "eframe",
- "egui-phosphor",
- "egui_plot",
 ]
 
 [[package]]
