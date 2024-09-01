@@ -7,20 +7,19 @@ use std::collections::{HashMap, VecDeque};
 pub struct DataContainer {
     /// Stores measurements for each stream. The key is the stream name, and the value is a buffer (VecDeque) of measurements.
     pub measurements: HashMap<String, VecDeque<f64>>,
-    /// The maximum number of measurements to keep. By default, 500;
+    /// The maximum number of measurements to keep. By default, 250;
     pub look_back: usize,
     /// Tracks total number of data streams being inputed.
-    pub stream_count: usize,
+    pub stream_count: usize, // WARN: this should not exists
     /// Tracks whether each stream should be plotted. The key is the stream name, and the value is a boolean.
     pub plot_tracker: HashMap<String, bool>,
 }
 
-// TODO: remove repetition here.
 impl Default for DataContainer {
     fn default() -> Self {
         Self {
             measurements: Default::default(),
-            look_back: 500,
+            look_back: 250,
             stream_count: Default::default(),
             plot_tracker: Default::default(),
         }
@@ -33,7 +32,7 @@ impl DataContainer {
     /// This method adds a new measurement to the specified stream, maintaining the maximum number
     /// of measurements defined by `look_back`. It also updates the `stream_count`.
     /// NOTE: This method automatically creates a new key for given index.
-    /// index: 0 --> key: Stream_0
+    /// eg: index: 0 --> key: Stream_0
     ///
     /// # Arguments
     ///
@@ -92,7 +91,7 @@ impl DataContainer {
 
     /// Updates the plot tracker to ensure all streams are accounted for.
     ///
-    /// This method initializes the `plot_tracker` if it's empty, adding an entry for each stream
+    /// This method initializes the [`plot_tracker`] if it's empty, adding an entry for each stream
     /// with a default value of `false`.
     ///
     /// # Example
@@ -129,7 +128,7 @@ mod tests {
     fn test_data_container_default() {
         let container = DataContainer::default();
         assert_eq!(container.measurements.len(), 0);
-        assert_eq!(container.look_back, 500);
+        assert_eq!(container.look_back, 250);
         assert_eq!(container.stream_count, 0);
         assert_eq!(container.plot_tracker.len(), 0);
     }
@@ -177,22 +176,26 @@ mod tests {
         let plot_points = container.get_plotpoints(0);
 
         assert_eq!(plot_points.points().len(), 2);
+        // check indexing
         assert_eq!(plot_points.points()[0].x, 0.0);
-        assert_eq!(plot_points.points()[0].y, 1.0);
         assert_eq!(plot_points.points()[1].x, 1.0);
+        // check values
+        assert_eq!(plot_points.points()[0].y, 1.0);
         assert_eq!(plot_points.points()[1].y, 2.0);
     }
 
     #[test]
     fn test_update_tracker() {
-        let mut container = DataContainer::default();
-        container.stream_count = 3;
+        let mut container = DataContainer {
+            stream_count: 3,
+            ..Default::default()
+        };
         container.update_tracker();
 
         assert_eq!(container.plot_tracker.len(), 3);
-        assert_eq!(container.plot_tracker["Stream_0"], false);
-        assert_eq!(container.plot_tracker["Stream_1"], false);
-        assert_eq!(container.plot_tracker["Stream_2"], false);
+        assert!(!container.plot_tracker["Stream_0"]);
+        assert!(!container.plot_tracker["Stream_1"]);
+        assert!(!container.plot_tracker["Stream_2"]);
 
         // Test that calling update_tracker() again doesn't change anything
         container.update_tracker();
@@ -201,7 +204,7 @@ mod tests {
         // Test updating an existing tracker
         container.plot_tracker.insert("Stream_1".to_string(), true);
         container.update_tracker();
-        assert_eq!(container.plot_tracker["Stream_1"], true);
+        assert!(container.plot_tracker["Stream_1"]);
     }
 
     #[test]
