@@ -34,8 +34,6 @@ struct App {
 
 impl App {
     /// Renders the top panel of the application.
-    ///
-    /// This panel contains the application label and buttons for closing the app and toggling the theme.
     fn render_top_panel(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::top("top panel").show(ctx, |ui| {
             ui.add_space(10.);
@@ -47,6 +45,8 @@ impl App {
                     let close_btn =
                         ui.add(egui::Button::new(egui_phosphor::regular::X.to_string()));
                     if close_btn.clicked() {
+                        // FIX: crashing while closing
+                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                         todo!();
                     }
                     let theme_btn =
