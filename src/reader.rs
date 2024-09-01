@@ -54,33 +54,3 @@ pub fn stdin_parser(stdin: io::Stdin) -> (Arc<Mutex<DataContainer>>, JoinHandle<
     });
     (streams_clone, reader_handle)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // TODO: how the hell do I d this?
-    #[test]
-    fn test_stdin_parser() {
-        // Simulate stdin input
-        let input = "1.0 2.0 3.0\n4.0 5.0 6.0\n7.0 8.0 9.0\n".as_bytes();
-
-        let (data, handle) = stdin_parser(io::stdin());
-
-        let container = data.lock().unwrap();
-        assert_eq!(container.stream_count, 3);
-        assert_eq!(container.measurements["Stream_0"].len(), 3);
-        assert_eq!(container.measurements["Stream_1"].len(), 3);
-        assert_eq!(container.measurements["Stream_2"].len(), 3);
-
-        assert_eq!(*container.measurements["Stream_0"].back().unwrap(), 7.0);
-        assert_eq!(*container.measurements["Stream_1"].back().unwrap(), 8.0);
-        assert_eq!(*container.measurements["Stream_2"].back().unwrap(), 9.0);
-
-        // Clean up the thread
-        drop(container);
-        handle.join().unwrap();
-
-        todo!();
-    }
-}
