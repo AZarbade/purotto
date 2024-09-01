@@ -120,3 +120,102 @@ impl DataContainer {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_data_container_default() {
+        let container = DataContainer::default();
+        assert_eq!(container.measurements.len(), 0);
+        assert_eq!(container.look_back, 500);
+        assert_eq!(container.stream_count, 0);
+        assert_eq!(container.plot_tracker.len(), 0);
+    }
+
+    #[test]
+    fn test_append_values() {
+        let mut container = DataContainer::default();
+
+        // Test appending to a single stream
+        container.append_values(0, 1.0);
+        container.append_values(0, 2.0);
+
+        assert_eq!(container.measurements["Stream_0"], vec![1.0, 2.0]);
+        assert_eq!(container.stream_count, 1);
+
+        // Test appending to multiple streams
+        container.append_values(1, 3.0);
+        container.append_values(2, 4.0);
+
+        assert_eq!(container.measurements["Stream_1"], vec![3.0]);
+        assert_eq!(container.measurements["Stream_2"], vec![4.0]);
+        assert_eq!(container.stream_count, 3);
+    }
+
+    #[test]
+    fn test_append_values_lookback() {
+        let mut container = DataContainer {
+            look_back: 2,
+            ..Default::default()
+        };
+
+        container.append_values(0, 1.0);
+        container.append_values(0, 2.0);
+        container.append_values(0, 3.0);
+
+        assert_eq!(container.measurements["Stream_0"], vec![2.0, 3.0]);
+    }
+
+    #[test]
+    fn test_get_plotpoints() {
+        let mut container = DataContainer::default();
+        container.append_values(0, 1.0);
+        container.append_values(0, 2.0);
+
+        let plot_points = container.get_plotpoints(0);
+
+        assert_eq!(plot_points.points().len(), 2);
+        assert_eq!(plot_points.points()[0].x, 0.0);
+        assert_eq!(plot_points.points()[0].y, 1.0);
+        assert_eq!(plot_points.points()[1].x, 1.0);
+        assert_eq!(plot_points.points()[1].y, 2.0);
+    }
+
+    #[test]
+    fn test_update_tracker() {
+        let mut container = DataContainer::default();
+        container.stream_count = 3;
+        container.update_tracker();
+
+        assert_eq!(container.plot_tracker.len(), 3);
+        assert_eq!(container.plot_tracker["Stream_0"], false);
+        assert_eq!(container.plot_tracker["Stream_1"], false);
+        assert_eq!(container.plot_tracker["Stream_2"], false);
+
+        // Test that calling update_tracker() again doesn't change anything
+        container.update_tracker();
+        assert_eq!(container.plot_tracker.len(), 3);
+
+        // Test updating an existing tracker
+        container.plot_tracker.insert("Stream_1".to_string(), true);
+        container.update_tracker();
+        assert_eq!(container.plot_tracker["Stream_1"], true);
+    }
+
+    #[test]
+    fn test_multiple_streams() {
+        let mut container = DataContainer::default();
+
+        container.append_values(0, 1.0);
+        container.append_values(1, 2.0);
+        container.append_values(2, 3.0);
+        container.append_values(0, 4.0);
+
+        assert_eq!(container.stream_count, 3);
+        assert_eq!(container.measurements["Stream_0"], vec![1.0, 4.0]);
+        assert_eq!(container.measurements["Stream_1"], vec![2.0]);
+        assert_eq!(container.measurements["Stream_2"], vec![3.0]);
+    }
+}
